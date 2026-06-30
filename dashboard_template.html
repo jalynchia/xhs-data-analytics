@@ -1,0 +1,899 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>小红书视频表现与受众特征分析报告</title>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Noto+Sans+SC:wght@300;400;500;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- ECharts CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'Noto Sans SC', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'ui-monospace', 'monospace'],
+                    },
+                    colors: {
+                        xhsRed: '#ff2442',      // Clean XHS Accent Red
+                        xhsRedMuted: '#fff1f2', // Ultra Light Red for backgrounds
+                        paperBg: '#f8fafc',     // Slate 50 light page background
+                        cardBorder: '#e2e8f0',   // Slate 200 light border
+                        textMain: '#0f172a',    // Slate 900 primary text
+                        textMuted: '#475569',   // Slate 600 secondary text
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        :root {
+            --bg-body: #f8fafc;
+            --bg-card: #ffffff;
+            --border-color: #e2e8f0;
+            --accent-red: #ff2442;
+            --text-primary: #0f172a;
+            --text-secondary: #475569;
+        }
+        body {
+            background-color: var(--bg-body);
+            color: var(--text-primary);
+            min-height: 100vh;
+            background-image: 
+                radial-gradient(at 0% 0%, rgba(255, 36, 66, 0.03) 0px, transparent 50%),
+                radial-gradient(at 100% 0%, rgba(255, 36, 66, 0.02) 0px, transparent 50%);
+        }
+        .premium-header {
+            background: rgba(255, 255, 255, 0.85);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid var(--border-color);
+            box-shadow: 0 4px 20px -2px rgba(15, 23, 42, 0.04);
+        }
+        .premium-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            box-shadow: 0 2px 12px -4px rgba(15, 23, 42, 0.06);
+            transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), 
+                        box-shadow 0.2s cubic-bezier(0.16, 1, 0.3, 1), 
+                        border-color 0.2s ease;
+        }
+        .premium-card:hover {
+            transform: translateY(-2px);
+            border-color: rgba(255, 36, 66, 0.25);
+            box-shadow: 0 10px 25px -10px rgba(255, 36, 66, 0.08), 
+                        0 2px 12px -4px rgba(15, 23, 42, 0.04);
+        }
+        
+        /* Bento Diagnostic Layout */
+        .bento-diagnostic {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 1.25rem;
+            width: 100%;
+        }
+        @media (min-width: 1024px) {
+            .bento-diagnostic {
+                grid-template-columns: 1fr 1.3fr 1fr;
+            }
+        }
+        
+        .bento-item {
+            border-radius: 16px;
+            padding: 1.5rem;
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-start;
+            border: 1px solid var(--border-color);
+            background: var(--bg-card);
+            transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.2s ease;
+        }
+        .bento-item:hover {
+            transform: translateY(-2px);
+            border-color: rgba(255, 36, 66, 0.2);
+        }
+        
+        /* Checklist items for readability */
+        .checklist-item {
+            display: flex;
+            align-items: flex-start;
+            gap: 0.625rem;
+            font-size: 0.875rem;
+            line-height: 1.5;
+            color: var(--text-primary);
+        }
+        .checklist-marker {
+            flex-shrink: 0;
+            margin-top: 0.1875rem;
+            width: 14px;
+            height: 14px;
+            border: 1.5px solid var(--accent-red);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .checklist-marker::after {
+            content: "";
+            width: 6px;
+            height: 6px;
+            background-color: var(--accent-red);
+            border-radius: 50%;
+            transform: scale(0);
+            transition: transform 0.2s ease;
+        }
+        .bento-item:hover .checklist-marker::after {
+            transform: scale(1);
+        }
+
+        /* Customize scrollbars */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 3px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+    </style>
+</head>
+<body class="p-4 md:p-6 overflow-x-hidden font-sans">
+    <div class="max-w-[1600px] mx-auto space-y-6">
+        
+        <!-- Header Banner -->
+        <header class="premium-header rounded-2xl p-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 relative overflow-hidden">
+            <div class="z-10">
+                <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-rose-50 text-xhsRed mb-2.5 border border-rose-100">
+                    <span class="w-1.5 h-1.5 bg-xhsRed rounded-full animate-pulse"></span>
+                    视频表现诊断报告
+                </span>
+                <h1 id="video-title" class="text-xl md:text-2xl font-bold tracking-tight text-slate-900 mb-1">加载中...</h1>
+                <p id="time-period" class="text-xs text-slate-500 font-normal font-mono">数据周期：-</p>
+            </div>
+            
+            <div class="flex flex-wrap gap-2 z-10 font-mono">
+                <div class="bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-center">
+                    <div class="text-[10px] text-slate-500 uppercase tracking-wider font-semibold mb-0.5">视频时长</div>
+                    <div id="video-duration" class="text-base font-bold text-slate-800">-</div>
+                </div>
+            </div>
+        </header>
+
+        <!-- Structured Diagnostic Card (Bento Action Guide) -->
+        <section id="diagnostic-card-container" class="hidden">
+            <!-- Filled dynamically -->
+        </section>
+
+        <!-- KPI Grid -->
+        <section class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
+            <div class="premium-card rounded-2xl p-4 flex flex-col justify-between min-h-[110px]">
+                <span class="text-xs font-medium text-slate-500">曝光数</span>
+                <span id="kpi-impressions" class="text-2xl font-bold text-slate-900 font-mono mt-2">-</span>
+            </div>
+            <div class="premium-card rounded-2xl p-4 flex flex-col justify-between min-h-[110px]">
+                <span class="text-xs font-medium text-slate-500">观看数</span>
+                <span id="kpi-views" class="text-2xl font-bold text-slate-900 font-mono mt-2">-</span>
+            </div>
+            <div class="premium-card rounded-2xl p-4 flex flex-col justify-between min-h-[110px]">
+                <span class="text-xs font-medium text-slate-500">封面点击率 (CTR)</span>
+                <span id="kpi-ctr" class="text-2xl font-bold text-xhsRed font-mono mt-2">-</span>
+            </div>
+            <div class="premium-card rounded-2xl p-4 flex flex-col justify-between min-h-[110px]">
+                <span class="text-xs font-medium text-slate-500">均播时长占比</span>
+                <span id="kpi-playtime-pct" class="text-2xl font-bold text-slate-800 font-mono mt-2">-</span>
+            </div>
+            <div class="premium-card rounded-2xl p-4 flex flex-col justify-between min-h-[110px]">
+                <span class="text-xs font-medium text-slate-500">整体互动率</span>
+                <span id="kpi-interact-pct" class="text-2xl font-bold text-slate-800 font-mono mt-2">-</span>
+            </div>
+            <div class="premium-card rounded-2xl p-4 flex flex-col justify-between min-h-[110px]">
+                <span class="text-xs font-medium text-slate-500">关注转化率</span>
+                <span id="kpi-follow-pct" class="text-2xl font-bold text-slate-800 font-mono mt-2">-</span>
+            </div>
+        </section>
+
+        <!-- Main Content Split -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            
+            <!-- Left 2/3 Dashboard Visualizations -->
+            <div class="lg:col-span-2 space-y-6">
+                
+                <!-- Chart 1: Retention -->
+                <div class="premium-card rounded-2xl p-5">
+                    <div class="flex justify-between items-center mb-4">
+                        <h2 class="text-sm font-bold text-slate-800 flex items-center gap-2">
+                            <span class="w-1.5 h-3.5 bg-xhsRed rounded-full"></span>
+                            秒级观看留存趋势
+                        </h2>
+                        <span class="text-[10px] text-slate-400 font-medium font-mono uppercase">支持拖拽缩放</span>
+                    </div>
+                    <div id="chart-retention" class="w-full h-[320px]"></div>
+                </div>
+
+                <!-- Chart 2: Source (Pie chart + Data Table) -->
+                <div class="premium-card rounded-2xl p-5">
+                    <h2 class="text-sm font-bold text-slate-800 mb-4 flex items-center gap-2">
+                        <span class="w-1.5 h-3.5 bg-xhsRed rounded-full"></span>
+                        观看来源渠道占比
+                    </h2>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 items-center">
+                        <div id="chart-sources" class="w-full h-[240px]"></div>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left text-xs font-normal">
+                                <thead>
+                                    <tr class="border-b border-slate-100 text-slate-400 font-semibold">
+                                        <th class="py-2.5">来源渠道</th>
+                                        <th class="py-2.5 text-right font-mono">占比</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="sources-table-body" class="divide-y divide-slate-50">
+                                    <!-- Dynamic rows for sources -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Fan vs Global Behavior Comparison Table -->
+                <div class="premium-card rounded-2xl p-5">
+                    <h2 class="text-sm font-bold text-slate-800 mb-4 flex items-center gap-2">
+                        <span class="w-1.5 h-3.5 bg-xhsRed rounded-full"></span>
+                        粉丝群体 vs 整体行为对比
+                    </h2>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left text-xs font-normal">
+                            <thead>
+                                <tr class="border-b border-slate-100 text-slate-400 font-semibold">
+                                    <th class="py-2.5">指标</th>
+                                    <th class="py-2.5 font-mono">整体</th>
+                                    <th class="py-2.5 font-mono">粉丝群体</th>
+                                    <th class="py-2.5 text-right font-mono">差值</th>
+                                </tr>
+                            </thead>
+                            <tbody id="fan-comparison-table-body" class="divide-y divide-slate-50">
+                                <!-- Dynamic rows -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Audience Demographics -->
+                <div class="premium-card rounded-2xl p-5">
+                    <h2 class="text-sm font-bold text-slate-800 mb-5 flex items-center gap-2">
+                        <span class="w-1.5 h-3.5 bg-xhsRed rounded-full"></span>
+                        观众人群画像
+                    </h2>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        <div>
+                            <div class="text-center text-xs text-slate-500 mb-3 font-semibold">性别分布</div>
+                            <div id="chart-gender" class="w-full h-[180px]"></div>
+                        </div>
+                        <div>
+                            <div class="text-center text-xs text-slate-500 mb-3 font-semibold">年龄区间分布</div>
+                            <div id="chart-age" class="w-full h-[180px]"></div>
+                        </div>
+                        <div>
+                            <div class="text-center text-xs text-slate-500 mb-3 font-semibold">Top 5 城市占比</div>
+                            <div id="chart-city" class="w-full h-[180px]"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Time-series charts (Stacked vertically) -->
+                <div class="space-y-6">
+                    <div class="premium-card rounded-2xl p-5">
+                        <h2 class="text-sm font-bold text-slate-800 mb-4 flex items-center gap-2">
+                            <span class="w-1.5 h-3.5 bg-xhsRed rounded-full"></span>
+                            天维度数据趋势
+                        </h2>
+                        <div id="chart-day" class="w-full h-[280px]"></div>
+                    </div>
+                    <div class="premium-card rounded-2xl p-5">
+                        <h2 class="text-sm font-bold text-slate-800 mb-4 flex items-center gap-2">
+                            <span class="w-1.5 h-3.5 bg-xhsRed rounded-full"></span>
+                            小时维度数据分布
+                        </h2>
+                        <div id="chart-hour" class="w-full h-[280px]"></div>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- Right 1/3 AI Deep Insights & Recommendations Panel -->
+            <div class="space-y-6 lg:h-full lg:flex lg:flex-col">
+                
+                <!-- Interact Details -->
+                <div class="premium-card rounded-2xl p-5">
+                    <h2 class="text-sm font-bold text-slate-800 mb-4 flex items-center gap-2">
+                        <span class="w-1.5 h-3.5 bg-xhsRed rounded-full"></span>
+                        互动表现详情
+                    </h2>
+                    <div class="grid grid-cols-2 gap-3.5 font-mono">
+                        <div class="bg-slate-50/50 rounded-xl p-3 border border-slate-100">
+                            <div class="text-[10px] text-slate-400 uppercase tracking-wider mb-0.5">点赞数</div>
+                            <div id="detail-likes" class="text-base font-bold text-slate-800">-</div>
+                        </div>
+                        <div class="bg-slate-50/50 rounded-xl p-3 border border-slate-100">
+                            <div class="text-[10px] text-slate-400 uppercase tracking-wider mb-0.5">收藏数</div>
+                            <div id="detail-collects" class="text-base font-bold text-slate-800">-</div>
+                        </div>
+                        <div class="bg-slate-50/50 rounded-xl p-3 border border-slate-100">
+                            <div class="text-[10px] text-slate-400 uppercase tracking-wider mb-0.5">评论数</div>
+                            <div id="detail-comments" class="text-base font-bold text-slate-800">-</div>
+                        </div>
+                        <div class="bg-slate-50/50 rounded-xl p-3 border border-slate-100">
+                            <div class="text-[10px] text-slate-400 uppercase tracking-wider mb-0.5">分享数</div>
+                            <div id="detail-shares" class="text-base font-bold text-slate-800">-</div>
+                        </div>
+                    </div>
+                    <div class="mt-4 pt-3.5 border-t border-slate-100 flex justify-between text-xs text-slate-500 font-mono">
+                        <span>收藏点赞比: <strong id="collect-like-ratio" class="text-slate-800 font-bold">-</strong></span>
+                        <span>互动率: <strong id="interact-rate-ratio" class="text-slate-800 font-bold">-</strong></span>
+                    </div>
+                </div>
+
+                <!-- AI Analysis -->
+                <div class="premium-card rounded-2xl p-6 relative overflow-hidden flex flex-col min-h-[600px] lg:flex-1">
+                    <h2 class="text-sm font-bold text-slate-800 mb-5 flex items-center gap-2">
+                        <span class="w-1.5 h-3.5 bg-xhsRed rounded-full"></span>
+                        深度内容诊断与运营演进分析
+                    </h2>
+                    
+                    <!-- Tab Headers -->
+                    <div class="flex border-b border-slate-100 mb-4 text-xs font-semibold">
+                        <button id="tab-btn-creation" class="flex-1 pb-3 text-xhsRed border-b-2 border-xhsRed focus:outline-none hover:text-slate-900 transition-colors duration-200">内容创作维度</button>
+                        <button id="tab-btn-ops" class="flex-1 pb-3 text-slate-400 border-b-2 border-transparent hover:text-slate-750 focus:outline-none transition-colors duration-200">渠道运营维度</button>
+                    </div>
+
+                    <!-- Tab Contents (No-Border Clean Layout) -->
+                    <div id="tab-content-creation" class="divide-y divide-slate-100 text-xs overflow-y-auto max-h-[750px] lg:max-h-none lg:flex-1 lg:h-0 pr-1 space-y-5">
+                        <div class="text-slate-400 italic py-4">正在注入创作视角分析...</div>
+                    </div>
+
+                    <div id="tab-content-ops" class="divide-y divide-slate-100 text-xs hidden overflow-y-auto max-h-[750px] lg:max-h-none lg:flex-1 lg:h-0 pr-1 space-y-5">
+                        <div class="text-slate-400 italic py-4">正在注入渠道运营视角分析...</div>
+                    </div>
+                </div>
+
+            </div>
+
+        </div>
+    </div>
+
+    <!-- Data Bridge & Runtime Engine -->
+    <script>
+        // Data injected from Python script
+        const DATA = {{DATA_PLACEHOLDER}};
+
+        // Render UI Texts (Clean title logic applied)
+        let rawTitle = DATA.title || '小红书视频分析报告';
+        let cleanTitle = rawTitle.replace(/\.xlsx$/i, '')
+                                 .replace(/[-_](播放|观看|互动)数据明细表?$/g, '')
+                                 .trim();
+        document.getElementById('video-title').textContent = cleanTitle;
+        
+        document.getElementById('time-period').textContent = `数据周期: ${DATA.time_period || '未知'}`;
+        document.getElementById('video-duration').textContent = `${DATA.video_duration_seconds}秒`;
+
+        // Format Percentages helper
+        const formatPct = (val) => {
+            if (val === undefined || val === null) return '-';
+            return (val * 100).toFixed(1) + '%';
+        };
+
+        // Render KPIs
+        document.getElementById('kpi-impressions').textContent = DATA.summary_kpi.impressions?.toLocaleString() || '-';
+        document.getElementById('kpi-views').textContent = DATA.summary_kpi.views?.toLocaleString() || '-';
+        document.getElementById('kpi-ctr').textContent = formatPct(DATA.summary_kpi.ctr);
+        document.getElementById('kpi-playtime-pct').textContent = formatPct(DATA.summary_kpi.average_playtime_pct);
+        document.getElementById('kpi-interact-pct').textContent = formatPct(DATA.summary_kpi.interact_rate);
+        document.getElementById('kpi-follow-pct').textContent = formatPct(DATA.summary_kpi.follower_conversion_rate);
+
+        // Render Interact Details
+        document.getElementById('detail-likes').textContent = DATA.interact_detail.likes?.toLocaleString() || '-';
+        document.getElementById('detail-collects').textContent = DATA.interact_detail.collects?.toLocaleString() || '-';
+        document.getElementById('detail-comments').textContent = DATA.interact_detail.comments?.toLocaleString() || '-';
+        document.getElementById('detail-shares').textContent = DATA.interact_detail.shares?.toLocaleString() || '-';
+        
+        const ratio = DATA.interact_detail.likes > 0 ? (DATA.interact_detail.collects / DATA.interact_detail.likes).toFixed(2) : '-';
+        document.getElementById('collect-like-ratio').textContent = ratio;
+        document.getElementById('interact-rate-ratio').textContent = formatPct(DATA.summary_kpi.interact_rate);
+
+        // Render Diagnostic Card (Bento Action Guide - Elegant Light Theme)
+        if (DATA.ai_analysis && DATA.ai_analysis.diagnostic_card) {
+            const cardData = DATA.ai_analysis.diagnostic_card;
+            const container = document.getElementById('diagnostic-card-container');
+            container.classList.remove('hidden');
+            container.className = "mb-6";
+            
+            // Helper to parse string or array into custom checklist list format
+            const renderToListHtml = (dataInput, isSemiBold = false) => {
+                if (!dataInput) return `<p class="text-sm text-slate-500">未检测到相应内容。</p>`;
+                let items = [];
+                if (Array.isArray(dataInput)) {
+                    items = dataInput;
+                } else if (typeof dataInput === 'string') {
+                    // Split by semicolon, newline, or Chinese full-width semicolon
+                    items = dataInput
+                        .split(/[;\n；]/)
+                        .map(s => s.trim())
+                        .filter(s => s.length > 0);
+                    
+                    // If still 1 long paragraph, try splitting by Chinese periods
+                    if (items.length <= 1) {
+                        items = dataInput
+                            .split(/。/)
+                            .map(s => s.trim())
+                            .filter(s => s.length > 0);
+                    }
+                }
+                
+                if (items.length === 0) return `<p class="text-sm text-slate-500">无数据</p>`;
+                
+                const weightClass = isSemiBold ? "font-semibold" : "font-normal";
+                return `
+                    <div class="space-y-2 mt-1">
+                        ${items.map(item => {
+                            // Strip leading list bullet points/numbers if any
+                            let clean = item.replace(/^([0-9一二三四五六七八九]+[\.、\s]+|[\-\*•①②③④⑤⑥⑦⑧⑨⑩]\s*)/, '');
+                            // Strip trailing commas or semicolons
+                            if (clean.endsWith('，') || clean.endsWith(',') || clean.endsWith('；') || clean.endsWith(';')) {
+                                clean = clean.slice(0, -1);
+                            }
+                            // Append a final period for sentence elements if it was split by periods and got stripped
+                            if (clean && !clean.endsWith('。') && !clean.endsWith('！') && !clean.endsWith('?') && !clean.endsWith('？')) {
+                                clean += '。';
+                            }
+                            return `
+                                <div class="checklist-item py-1">
+                                    <span class="checklist-marker"></span>
+                                    <span class="text-sm text-slate-900 leading-relaxed ${weightClass}">${clean}</span>
+                                </div>
+                            `;
+                        }).join('')}
+                    </div>
+                `;
+            };
+
+            const coreQualitativeHtml = renderToListHtml(cardData.core_定性, true);
+            const actionsHtml = renderToListHtml(cardData.physical_actions, false);
+            const topicRecommendationHtml = renderToListHtml(cardData.next_topic_recommendation, false);
+            
+            container.innerHTML = `
+                <div class="bento-diagnostic">
+                    <div class="bento-item">
+                        <strong class="text-xs font-bold text-slate-800 flex items-center gap-1.5 mb-3.5">
+                            <svg class="w-4 h-4 text-xhsRed" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                            核心表现定性
+                        </strong>
+                        ${coreQualitativeHtml}
+                    </div>
+                    <div class="bento-item">
+                        <strong class="text-xs font-bold text-slate-800 flex items-center gap-1.5 mb-3.5">
+                            <svg class="w-4 h-4 text-xhsRed" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 111.063 1.06l-.02.041a.75.75 0 11-1.063-1.06z"></path><path stroke-linecap="round" stroke-linejoin="round" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                            针对性优化动作
+                        </strong>
+                        ${actionsHtml}
+                    </div>
+                    <div class="bento-item">
+                        <strong class="text-xs font-bold text-slate-800 flex items-center gap-1.5 mb-3.5">
+                            <svg class="w-4 h-4 text-xhsRed" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 18a3.75 3.75 0 00.495-7.467 5.99 5.99 0 00-1.925 3.546 5.974 5.974 0 01-2.133-1A3.75 3.75 0 0012 18z"></path></svg>
+                            选题演进方向
+                        </strong>
+                        ${topicRecommendationHtml}
+                    </div>
+                </div>
+            `;
+        }
+
+        // Render Traffic Sources Table
+        const sourcesTbody = document.getElementById('sources-table-body');
+        const colorList = ['#ff2442', '#38bdf8', '#818cf8', '#fb7185', '#94a3b8'];
+        Object.entries(DATA.traffic_sources).forEach(([k, v], idx) => {
+            const tr = document.createElement('tr');
+            tr.className = "hover:bg-slate-50/50 transition-colors";
+            const dotColor = colorList[idx % colorList.length];
+            tr.innerHTML = `
+                <td class="py-3 font-medium text-slate-850 flex items-center gap-2">
+                    <span class="w-2.5 h-2.5 rounded-full border-2 border-white shadow-[0_0_0_1.5px_${dotColor}]" style="background-color: ${dotColor}"></span>
+                    ${k}
+                </td>
+                <td class="py-3 text-right text-slate-700 font-mono font-medium">${formatPct(v)}</td>
+            `;
+            sourcesTbody.appendChild(tr);
+        });
+
+        // Render Fan Comparison Table
+        const comparisonTbody = document.getElementById('fan-comparison-table-body');
+        DATA.fan_comparison.forEach(item => {
+            const tr = document.createElement('tr');
+            tr.className = "hover:bg-slate-50/50 transition-colors";
+            
+            let diffStr = '-';
+            let diffClass = 'text-slate-400';
+            if (item.diff !== null && item.diff !== undefined) {
+                const prefix = item.diff > 0 ? '+' : '';
+                const isPct = item.unit === '%';
+                
+                const greenText = 'text-teal-600 font-bold';
+                const redText = 'text-xhsRed font-bold';
+                
+                let isFavorable = false;
+                if (item.metric_name === '2秒退出率') {
+                    isFavorable = item.diff < 0; // lower exit is better
+                } else {
+                    isFavorable = item.diff > 0;
+                }
+                diffClass = isFavorable ? greenText : redText;
+                
+                if (isPct) {
+                    diffStr = prefix + (item.diff * 100).toFixed(1) + 'pp';
+                } else {
+                    diffStr = prefix + item.diff.toFixed(1) + (item.unit || '');
+                }
+            }
+
+            const valGlobal = item.unit === '%' ? formatPct(item.global_val) : (item.global_val + (item.unit || ''));
+            const valFan = item.unit === '%' ? formatPct(item.fan_val) : (item.fan_val + (item.unit || ''));
+
+            tr.innerHTML = `
+                <td class="py-3.5 font-medium text-slate-750">${item.metric_name}</td>
+                <td class="py-3.5 text-slate-500 font-mono">${valGlobal}</td>
+                <td class="py-3.5 text-slate-900 font-bold font-mono">${valFan}</td>
+                <td class="py-3.5 text-right font-mono ${diffClass}">${diffStr}</td>
+            `;
+            comparisonTbody.appendChild(tr);
+        });
+
+        // Highlight helper to make diagnostics easy to scan
+        const highlightKeyPhrases = (text) => {
+            if (!text) return '';
+            const keyPatterns = [
+                /留存率稳定/g, /前\d秒退出极高/g, /流失速度偏快/g, /前\d秒流失较快/g, /跳出率极高/g,
+                /高完播/g, /强吸引力/g, /受众精准/g, /内容质量极佳/g, /点击率偏低/g, /互动转化极强/g,
+                /选题十分契合/g, /黄金时间/g, /粉丝粘性极强/g, /建议/g, /优化/g, /注意/g, /核心动作/g,
+                /降低跳出率/g, /提升前两秒/g, /强化开篇/g, /调整结构/g
+            ];
+            let highlighted = text;
+            keyPatterns.forEach(pattern => {
+                highlighted = highlighted.replace(pattern, (match) => `<strong class="text-slate-900 font-bold">${match}</strong>`);
+            });
+            return highlighted;
+        };
+
+        // Inject AI Analysis Text
+        const renderAnalysis = (containerId, points) => {
+            const container = document.getElementById(containerId);
+            container.innerHTML = '';
+            points.forEach(pt => {
+                const div = document.createElement('div');
+                div.className = "py-4 space-y-2.5 first:pt-0";
+                
+                const actionHtml = pt.action_suggestions.map(s => `
+                    <li class="flex items-start gap-1.5">
+                        <span class="text-xhsRed font-bold flex-shrink-0 mt-0.5">·</span>
+                        <span class="text-slate-600">${s}</span>
+                    </li>
+                `).join('');
+
+                div.innerHTML = `
+                    <div class="space-y-1.5">
+                        <h3 class="font-bold text-slate-800 text-sm flex items-center gap-1.5">
+                            <span class="w-1.5 h-1.5 bg-xhsRed rounded-full flex-shrink-0"></span>
+                            ${pt.point_name}
+                        </h3>
+                        <div class="inline-block bg-slate-50 text-slate-600 rounded px-2.5 py-1 font-mono text-[10.5px] font-medium border border-slate-100">
+                            <span class="text-xhsRed font-semibold mr-1">数据表现:</span>${pt.data_performance}
+                        </div>
+                    </div>
+                    <p class="text-slate-500 text-xs leading-relaxed">
+                        <span class="text-slate-700 font-semibold">诊断：</span>${highlightKeyPhrases(pt.diagnosis_insight)}
+                    </p>
+                    <div class="mt-2">
+                        <ul class="text-[11px] space-y-1 font-medium">${actionHtml}</ul>
+                    </div>
+                `;
+                container.appendChild(div);
+            });
+        };
+
+        if (DATA.ai_analysis) {
+            renderAnalysis('tab-content-creation', DATA.ai_analysis.creation_perspective || []);
+            renderAnalysis('tab-content-ops', DATA.ai_analysis.ops_perspective || []);
+        }
+
+        // Tab switches
+        const tabBtnCreation = document.getElementById('tab-btn-creation');
+        const tabBtnOps = document.getElementById('tab-btn-ops');
+        const tabContentCreation = document.getElementById('tab-content-creation');
+        const tabContentOps = document.getElementById('tab-content-ops');
+
+        tabBtnCreation.addEventListener('click', () => {
+            tabBtnCreation.className = "flex-1 pb-3 text-xhsRed border-b-2 border-xhsRed focus:outline-none hover:text-slate-900 transition-colors duration-200";
+            tabBtnOps.className = "flex-1 pb-3 text-slate-400 border-b-2 border-transparent hover:text-slate-750 focus:outline-none transition-colors duration-200";
+            tabContentCreation.classList.remove('hidden');
+            tabContentOps.classList.add('hidden');
+        });
+
+        tabBtnOps.addEventListener('click', () => {
+            tabBtnOps.className = "flex-1 pb-3 text-xhsRed border-b-2 border-xhsRed focus:outline-none hover:text-slate-900 transition-colors duration-200";
+            tabBtnCreation.className = "flex-1 pb-3 text-slate-400 border-b-2 border-transparent hover:text-slate-750 focus:outline-none transition-colors duration-200";
+            tabContentOps.classList.remove('hidden');
+            tabContentCreation.classList.add('hidden');
+        });
+
+
+        // ------------------ ECHARTS CONFIGURATION ------------------
+        
+        // Custom Light Theme Options
+        const chartGrid = { top: 30, right: 15, bottom: 20, left: 45 };
+        const labelStyle = { color: '#64748b', fontSize: 10 };
+        const splitLineStyle = { lineStyle: { color: '#f1f5f9' } }; // light border lines
+
+        // 1. Chart Retention (Crimson & Muted Gray curves)
+        const domRetention = document.getElementById('chart-retention');
+        const chartRetention = echarts.init(domRetention, null, { renderer: 'canvas' });
+        
+        const trendSeconds = DATA.time_series_retention.map(x => x.second);
+        const trendVal = DATA.time_series_retention.map(x => (x.retention * 100).toFixed(1));
+        const similarVal = DATA.time_series_retention.map(x => (x.similar_retention * 100).toFixed(1));
+
+        const srtList = DATA.subtitles || [];
+        const getSubtitleForSecond = (sec) => {
+            const match = srtList.find(sub => sec >= sub.start && sec <= sub.end);
+            return match ? match.text : '';
+        };
+
+        chartRetention.setOption({
+            backgroundColor: 'transparent',
+            tooltip: { 
+                trigger: 'axis', 
+                backgroundColor: 'rgba(255, 255, 255, 0.95)',
+                borderColor: '#e2e8f0',
+                borderWidth: 1,
+                textStyle: { color: '#0f172a', fontSize: 11 },
+                extraCssText: 'box-shadow: 0 4px 12px rgba(15, 23, 42, 0.05); border-radius: 8px; backdrop-filter: blur(4px);',
+                formatter: (params) => {
+                    const sec = params[0].name;
+                    const val0 = params[0].value;
+                    const val1 = params[1] ? params[1].value : '-';
+                    const subText = getSubtitleForSecond(parseFloat(sec));
+                    let res = `<strong style="color:#0f172a">${sec}秒</strong><br/>本视频: <span style="color:#ff2442;font-weight:bold">${val0}%</span><br/>同类均值: <span style="color:#64748b;font-weight:bold">${val1}%</span>`;
+                    if (subText) {
+                        res += `<br/><span style="color:#0284c7;font-size:10.5px;display:inline-block;margin-top:4px;max-width:240px;white-space:normal;word-break:break-all;">🎤 字幕: ${subText}</span>`;
+                    }
+                    return res;
+                }
+            },
+            legend: { data: ['本视频留存率', '同类视频平均'], right: 10, top: 0, textStyle: { color: '#64748b', fontSize: 11 } },
+            grid: { top: 40, right: 20, bottom: 65, left: 50 },
+            xAxis: {
+                type: 'category',
+                data: trendSeconds,
+                axisLabel: { formatter: '{value}s', color: '#64748b', fontSize: 10, interval: Math.floor(trendSeconds.length / 10) },
+                axisLine: { lineStyle: { color: '#cbd5e1' } }
+            },
+            yAxis: {
+                type: 'value',
+                axisLabel: { formatter: '{value}%', color: '#64748b', fontSize: 10 },
+                splitLine: splitLineStyle,
+                max: 100
+            },
+            dataZoom: [
+                { type: 'inside', start: 0, end: 100 }, 
+                { 
+                    type: 'slider', 
+                    bottom: 15, 
+                    start: 0, 
+                    end: 100, 
+                    textStyle: { color: '#64748b' },
+                    borderColor: '#e2e8f0',
+                    fillerColor: 'rgba(255, 36, 66, 0.04)',
+                    handleIcon: 'path://M10.7,11.9v-1.3H9.3v1.3c-4.9,0.3-8.8,4.4-8.8,9.4c0,5,3.9,9.1,8.8,9.4v1.3h1.3v-1.3c4.9-0.3,8.8-4.4,8.8-9.4C19.5,16.3,15.6,12.2,10.7,11.9z M13.3,24.4H6.7V23h6.6V24.4z M13.3,19.6H6.7v-1.4h6.6V19.6z',
+                    handleSize: '100%',
+                    handleStyle: { color: '#fff', shadowBlur: 3, shadowColor: 'rgba(0, 0, 0, 0.15)' }
+                }
+            ],
+            series: [
+                { 
+                    name: '本视频留存率', 
+                    type: 'line', 
+                    data: trendVal, 
+                    showSymbol: false, 
+                    lineStyle: { color: '#ff2442', width: 3 }, 
+                    itemStyle: { color: '#ff2442' },
+                    areaStyle: {
+                        color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+                            { offset: 0, color: 'rgba(255, 36, 66, 0.08)' },
+                            { offset: 1, color: 'rgba(255, 36, 66, 0)' }
+                        ])
+                    }
+                },
+                { name: '同类视频平均', type: 'line', data: similarVal, showSymbol: false, lineStyle: { color: '#94a3b8', width: 2, type: 'dashed' }, itemStyle: { color: '#94a3b8' } }
+            ]
+        });
+
+        // 2. Chart Sources
+        const domSources = document.getElementById('chart-sources');
+        const chartSources = echarts.init(domSources, null);
+        
+        const sourceData = Object.entries(DATA.traffic_sources).map(([k, v]) => ({ name: k, value: (v * 100).toFixed(1) }));
+        
+        chartSources.setOption({
+            backgroundColor: 'transparent',
+            tooltip: { 
+                trigger: 'item', 
+                backgroundColor: 'rgba(255, 255, 255, 0.95)',
+                borderColor: '#e2e8f0',
+                borderWidth: 1,
+                formatter: '{b}: <span style="color:#ff2442;font-weight:bold">{c}%</span>',
+                extraCssText: 'box-shadow: 0 4px 12px rgba(15, 23, 42, 0.05); border-radius: 8px;'
+            },
+            series: [{
+                type: 'pie',
+                radius: ['45%', '75%'],
+                avoidLabelOverlap: false,
+                itemStyle: { borderRadius: 8, borderColor: '#ffffff', borderWidth: 2.5 },
+                label: { show: false },
+                data: sourceData,
+                color: colorList
+            }]
+        });
+
+        // 3. Gender Chart
+        const domGender = document.getElementById('chart-gender');
+        const chartGender = echarts.init(domGender, null);
+        const genderData = Object.entries(DATA.demographics.gender).map(([k, v]) => ({ name: k, value: (v * 100).toFixed(1) }));
+        chartGender.setOption({
+            backgroundColor: 'transparent',
+            tooltip: { 
+                trigger: 'item', 
+                backgroundColor: 'rgba(255, 255, 255, 0.95)',
+                borderColor: '#e2e8f0',
+                borderWidth: 1,
+                formatter: '{b}: <strong>{c}%</strong>',
+                extraCssText: 'box-shadow: 0 4px 12px rgba(15, 23, 42, 0.05); border-radius: 8px;'
+            },
+            series: [{
+                type: 'pie',
+                radius: ['40%', '70%'],
+                avoidLabelOverlap: false,
+                itemStyle: { borderRadius: 6, borderColor: '#ffffff', borderWidth: 2 },
+                label: { show: true, position: 'inside', formatter: '{b}\n{c}%', fontSize: 10, fontWeight: '500', color: '#fff' },
+                data: genderData,
+                color: ['#ff2442', '#94a3b8']
+            }]
+        });
+
+        // 4. Age Chart
+        const domAge = document.getElementById('chart-age');
+        const chartAge = echarts.init(domAge, null);
+        const ageKeys = Object.keys(DATA.demographics.age);
+        const ageVals = Object.values(DATA.demographics.age).map(x => (x * 100).toFixed(1));
+        chartAge.setOption({
+            backgroundColor: 'transparent',
+            grid: { top: 15, right: 10, bottom: 25, left: 35 },
+            xAxis: { type: 'category', data: ageKeys, axisLabel: { color: '#64748b', fontSize: 9 }, axisLine: { lineStyle: { color: '#e2e8f0' } } },
+            yAxis: { type: 'value', axisLabel: { formatter: '{value}%', color: '#64748b', fontSize: 8 }, splitLine: { show: false } },
+            series: [{
+                type: 'bar',
+                data: ageVals,
+                barWidth: '45%',
+                itemStyle: { 
+                    color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+                        { offset: 0, color: '#ff5c75' },
+                        { offset: 1, color: '#ff2442' }
+                    ]), 
+                    borderRadius: [4, 4, 0, 0] 
+                },
+                label: { show: true, position: 'top', formatter: '{c}%', fontSize: 9, color: '#475569', fontWeight: 'bold' }
+            }]
+        });
+
+        // 5. City Chart
+        const domCity = document.getElementById('chart-city');
+        const chartCity = echarts.init(domCity, null);
+        const cityData = DATA.demographics.city_top5 || DATA.demographics.city || {};
+        const cityKeys = Object.keys(cityData).slice(0, 5);
+        const cityVals = Object.values(cityData).slice(0, 5).map(x => (x * 100).toFixed(1));
+        chartCity.setOption({
+            backgroundColor: 'transparent',
+            grid: { top: 15, right: 15, bottom: 25, left: 40 },
+            xAxis: { type: 'category', data: cityKeys, axisLabel: { color: '#64748b', fontSize: 9 }, axisLine: { lineStyle: { color: '#e2e8f0' } } },
+            yAxis: { type: 'value', axisLabel: { formatter: '{value}%', color: '#64748b', fontSize: 8 }, splitLine: { show: false } },
+            series: [{
+                type: 'bar',
+                data: cityVals,
+                barWidth: '45%',
+                itemStyle: { 
+                    color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+                        { offset: 0, color: '#94a3b8' },
+                        { offset: 1, color: '#64748b' }
+                    ]), 
+                    borderRadius: [4, 4, 0, 0] 
+                },
+                label: { show: true, position: 'top', formatter: '{c}%', fontSize: 9, color: '#475569', fontWeight: 'bold' }
+            }]
+        });
+
+        // 6. Chart Day
+        const domDay = document.getElementById('chart-day');
+        const chartDay = echarts.init(domDay, null);
+        const dayDates = DATA.time_series_day.map(x => x.date);
+        const dayViews = DATA.time_series_day.map(x => x.views);
+        const dayLikes = DATA.time_series_day.map(x => x.likes);
+        chartDay.setOption({
+            backgroundColor: 'transparent',
+            tooltip: { 
+                trigger: 'axis',
+                backgroundColor: 'rgba(255, 255, 255, 0.95)',
+                borderColor: '#e2e8f0',
+                borderWidth: 1,
+                extraCssText: 'box-shadow: 0 4px 12px rgba(15, 23, 42, 0.05); border-radius: 8px;'
+            },
+            legend: { data: ['播放量', '点赞数'], right: 10, top: 0, textStyle: { color: '#64748b', fontSize: 10 } },
+            grid: { top: 35, right: 35, bottom: 25, left: 45 },
+            xAxis: { type: 'category', data: dayDates, axisLabel: { color: '#64748b', fontSize: 9 }, axisLine: { lineStyle: { color: '#e2e8f0' } } },
+            yAxis: [
+                { type: 'value', name: '播放', axisLabel: { color: '#64748b', fontSize: 8 }, splitLine: splitLineStyle },
+                { type: 'value', name: '点赞', axisLabel: { color: '#64748b', fontSize: 8 }, splitLine: { show: false } }
+            ],
+            series: [
+                { name: '播放量', type: 'line', data: dayViews, lineStyle: { color: '#64748b', width: 2.5 }, itemStyle: { color: '#64748b' } },
+                { name: '点赞数', type: 'line', yAxisIndex: 1, data: dayLikes, lineStyle: { color: '#ff2442', width: 2.5 }, itemStyle: { color: '#ff2442' } }
+            ]
+        });
+
+        // 7. Chart Hour
+        const domHour = document.getElementById('chart-hour');
+        const chartHour = echarts.init(domHour, null);
+        const hourTimes = DATA.time_series_hour.map(x => x.hour);
+        const hourAvgTime = DATA.time_series_hour.map(x => x.avg_watch_seconds);
+        const hourCompletion = DATA.time_series_hour.map(x => (x.completion_rate * 100).toFixed(1));
+        chartHour.setOption({
+            backgroundColor: 'transparent',
+            tooltip: { 
+                trigger: 'axis',
+                backgroundColor: 'rgba(255, 255, 255, 0.95)',
+                borderColor: '#e2e8f0',
+                borderWidth: 1,
+                extraCssText: 'box-shadow: 0 4px 12px rgba(15, 23, 42, 0.05); border-radius: 8px;'
+            },
+            legend: { data: ['人均看长(秒)', '完播率'], right: 10, top: 0, textStyle: { color: '#64748b', fontSize: 10 } },
+            grid: { top: 35, right: 35, bottom: 25, left: 45 },
+            xAxis: { type: 'category', data: hourTimes, axisLabel: { color: '#64748b', fontSize: 8 }, axisLine: { lineStyle: { color: '#e2e8f0' } } },
+            yAxis: [
+                { type: 'value', name: '秒', axisLabel: { color: '#64748b', fontSize: 8 }, splitLine: splitLineStyle },
+                { type: 'value', name: '完播', axisLabel: { formatter: '{value}%', color: '#64748b', fontSize: 8 }, splitLine: { show: false } }
+            ],
+            series: [
+                { name: '人均看长(秒)', type: 'bar', data: hourAvgTime, itemStyle: { color: '#94a3b8', opacity: 0.6 } },
+                { name: '完播率', type: 'line', yAxisIndex: 1, data: hourCompletion, lineStyle: { color: '#ff2442', width: 2.5 }, itemStyle: { color: '#ff2442' } }
+            ]
+        });
+
+        // Window resize binding
+        window.addEventListener('resize', () => {
+            chartRetention.resize();
+            chartSources.resize();
+            chartGender.resize();
+            chartAge.resize();
+            chartCity.resize();
+            chartDay.resize();
+            chartHour.resize();
+        });
+    </script>
+</body>
+</html>
